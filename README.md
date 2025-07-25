@@ -4,16 +4,16 @@ A hyper-performant SwiGLU MoE kernel, optimized for inference, as well as memory
 
 To read more about MoMoE, check out [our blog post](https://www.tilderesearch.com/blog/momoe)
 
-![Different MoE Full Pass Speeds](./images/moe_full.png)
+![Different MoE Full Pass Speeds](./MoMoE/images/moe_full.png)
 
-![Different MoE Forward Pass Speeds](./images/moe_forward.png)
+![Different MoE Forward Pass Speeds](./MoMoE/images/moe_forward.png)
 
-![Different MoE Memory Usage](./images/moe_memory.png)
+![Different MoE Memory Usage](./MoMoE/images/moe_memory.png)
 
 ## Installation
 ```bash
 # Using uv (recommended pip/conda alternative) pip install
-uv pip install git+https://github.com/tilde-research/MoMoE-impl.git
+pip install git+https://github.com/tilde-research/MoMoE-impl.git
 
 # OR
 
