@@ -13,7 +13,6 @@ M: B * S
 D: embedding dimension
 N: number of experts
 Ng: number of gating experts
-Ks: (selected) number of shared experts
 Kg: selected number of gating experts
 K: selected total number of experts
 H: dimension of the hidden layer
@@ -74,7 +73,7 @@ tensor which is used in the second part of our MoE.
 @triton.jit
 def lin1_kernel(
         x_ptr_MD, Wl1_ptr_ND2H, a_MsaveH, b_MsaveH, h_ptr_MsumH, idx_ptr_Msum, cumsums_N,
-        M: tl.constexpr, D: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, N: tl.constexpr, Ks: tl.constexpr,
+        M: tl.constexpr, D: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, N: tl.constexpr,
         stride_xM, stride_xD,
         stride_WN, stride_WD, stride_W2H,
         stride_aMsave, stride_aH,
@@ -166,7 +165,7 @@ The output is stored in y_ptr_MD, which is expected to be a float32 tensor
 @triton.jit
 def lin2_kernel(
         h_ptr_MsumH, Wl2_ptr_NHD, y_pre_MsaveD, y_ptr_KMD, s_ptr_NM, idx_ptr_Msum, which_ptr_Msum, cumsums_N,
-        M: tl.constexpr, D: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, N: tl.constexpr, Ks: tl.constexpr,
+        M: tl.constexpr, D: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, N: tl.constexpr,
         stride_hMsum, stride_hH,
         stride_WN, stride_WH, stride_WD,
         stride_ypreMsave, stride_ypreD,
@@ -242,7 +241,7 @@ Apply the experts to the input tensor x_MD, using the gating weights s_NM
 Uses the 2 Triton kernels defined above to do the forward pass
 Returns the output y_MD
 """
-def apply_experts(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD, K, Ks, save_percent):
+def apply_experts(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD, K, save_percent):
     
     M, D = x_MD.shape
     Msum = idx_Msum.shape[0]
@@ -265,7 +264,7 @@ def apply_experts(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD
     # linear layer 1 + SwiGLU stored in an Msum x H matrix
     lin1_kernel[grid1](
         x_MD, Wl1_ND2H, a_MsaveH, b_MsaveH, h_MsumH, idx_Msum, cumsums_N,
-        M, D, Msum, Msave, H, N, Ks,
+        M, D, Msum, Msave, H, N,
         x_MD.stride(0), x_MD.stride(1),
         Wl1_ND2H.stride(0), Wl1_ND2H.stride(1), Wl1_ND2H.stride(2),
         a_MsaveH.stride(0), a_MsaveH.stride(1),
@@ -278,7 +277,7 @@ def apply_experts(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD
     # linear layer 2 + scatter into y_MD, properly multiplied by gating weights
     lin2_kernel[grid2](
         h_MsumH, Wl2_NHD, y_pre_MsaveD, y_KMD, s_NM, idx_Msum, which_Msum, cumsums_N,
-        M, D, Msum, Msave, H, N, Ks,
+        M, D, Msum, Msave, H, N,
         h_MsumH.stride(0), h_MsumH.stride(1),
         Wl2_NHD.stride(0), Wl2_NHD.stride(1), Wl2_NHD.stride(2),
         y_pre_MsaveD.stride(0), y_pre_MsaveD.stride(1),
@@ -299,7 +298,7 @@ which used to be the bottleneck of the backward pass.
 @triton.jit
 def making_nice_scatter_kernel(
         x_ptr_MD, x_ptr_MsumD, G_y_ptr_MD, G_y_ptr_MsumD, idx_ptr_Msum, cumsums_ptr_N, s_ptr_MN,
-        N: tl.constexpr, Msum: tl.constexpr, D: tl.constexpr, H: tl.constexpr, Ks: tl.constexpr,
+        N: tl.constexpr, Msum: tl.constexpr, D: tl.constexpr, H: tl.constexpr,
         stride_xM, stride_xD,
         stride_xMsum, stride_xD2,
         stride_GyM, stride_GyD,
@@ -361,7 +360,7 @@ linear 1 or linear 2, depending on the input tensors
 @triton.jit
 def weights_update_kernel(
         G_W_ptr_NXY, G_b_ptr_MsumY, a_ptr_MsumX, cumsums_ptr_N,
-        N: tl.constexpr, X: tl.constexpr, Y: tl.constexpr, Msum: tl.constexpr, Ks: tl.constexpr,
+        N: tl.constexpr, X: tl.constexpr, Y: tl.constexpr, Msum: tl.constexpr,
         stride_WN, stride_WX, stride_WY,
         stride_bMsum, stride_bY,
         stride_aMsum, stride_aX,
@@ -426,7 +425,7 @@ saving the intermediate results of the forward pass.
 @triton.jit
 def swiglu_backward_kernel(
         x_ptr_MsumD, a_MsaveH, b_MsaveH, Wl1_ptr_ND2H, G_z_ptr_Msum2H, G_y_ptr_MsumD, Wl2_ptr_NHD, h_ptr_MsumH, cumsums_N,
-        M: tl.constexpr, N: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, D: tl.constexpr, Ks: tl.constexpr,
+        M: tl.constexpr, N: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, D: tl.constexpr,
         stride_xMsum, stride_xD,
         stride_aMsave, stride_aH,
         stride_bMsave, stride_bH,
@@ -542,7 +541,7 @@ Performs the first part of the backward pass of the MoE, which fuses:
 2. Linear 2 backward pass
 3. SwiGLU backward pass
 """
-def lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD, idx_Msum, cumsums_N, s_MN, Ks, save_percent):
+def lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD, idx_Msum, cumsums_N, s_MN, save_percent):
     M, D = G_y_MD.shape
     N, H, D = Wl2_NHD.shape
     Msum = idx_Msum.shape[0]
@@ -565,7 +564,7 @@ def lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD
 
     making_nice_scatter_kernel[grid0](
         x_MD, x_MsumD, G_y_MD, G_y_MsumD, idx_Msum, cumsums_N, s_MN,
-        N, Msum, D, H, Ks,
+        N, Msum, D, H,
         x_MD.stride(0), x_MD.stride(1),
         x_MsumD.stride(0), x_MsumD.stride(1),
         G_y_MD.stride(0), G_y_MD.stride(1),
@@ -578,7 +577,7 @@ def lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD
 
     swiglu_backward_kernel[grid2](
         x_MsumD, a_MsaveH, b_MsaveH, Wl1_ND2H, G_z_Msum2H, G_y_MsumD, Wl2_NHD, h_MsumH, cumsums_N,
-        M, N, Msum, Msave, H, D, Ks,
+        M, N, Msum, Msave, H, D,
         x_MsumD.stride(0), x_MsumD.stride(1),
         a_MsaveH.stride(0), a_MsaveH.stride(1),
         b_MsaveH.stride(0), b_MsaveH.stride(1),
@@ -593,7 +592,7 @@ def lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD
     # update weights of linear 2
     weights_update_kernel[grid1](
         G_Wl2_NHD, G_y_MsumD, h_MsumH, cumsums_N,
-        N, H, D, Msum, Ks,
+        N, H, D, Msum,
         Wl2_NHD.stride(0), Wl2_NHD.stride(1), Wl2_NHD.stride(2),
         G_y_MsumD.stride(0), G_y_MsumD.stride(1),
         h_MsumH.stride(0), h_MsumH.stride(1),
@@ -618,7 +617,7 @@ so that we can use the atomic add operation.
 @triton.jit
 def lin1_backward_kernel(
         G_z_ptr_Msum2H, y_pre_MsaveD, Wl1_ptr_ND2H, Wl2_ptr_NHD, h_ptr_MsumH, G_x_ptr_KMD, G_s_ptr_NM, G_y_ptr_MD, idx_ptr_Msum, which_ptr_Msum, cumsums_N,
-        M: tl.constexpr, D: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, N: tl.constexpr, Ks: tl.constexpr,
+        M: tl.constexpr, D: tl.constexpr, Msum: tl.constexpr, Msave: tl.constexpr, H: tl.constexpr, N: tl.constexpr,
         stride_zMsum, stride_z2H,
         stride_ypreMsave, stride_ypreD,
         stride_W1N, stride_W1D, stride_W12H,
@@ -711,7 +710,7 @@ The outputs are stored in G_x_MD and G_s_NM, which are the gradients of the inpu
 and the gate activations, respectively. These are expected to be float32 tensors
 so that we can use the atomic add operation.
 """
-def lin1_backward(x_MsumD, y_pre_MsaveD, G_z_Msum2H, Wl1_ND2H, Wl2_NHD, h_MsumH, idx_Msum, which_Msum, cumsums_N, G_y_MD, K, Ks, save_percent):
+def lin1_backward(x_MsumD, y_pre_MsaveD, G_z_Msum2H, Wl1_ND2H, Wl2_NHD, h_MsumH, idx_Msum, which_Msum, cumsums_N, G_y_MD, K, save_percent):
     M, D = G_y_MD.shape
     N, D, H2 = Wl1_ND2H.shape
     H = H2 // 2
@@ -730,7 +729,7 @@ def lin1_backward(x_MsumD, y_pre_MsaveD, G_z_Msum2H, Wl1_ND2H, Wl2_NHD, h_MsumH,
     # update weights of linear 1
     weights_update_kernel[grid1](
         G_Wl1_ND2H, G_z_Msum2H, x_MsumD, cumsums_N,
-        N, D, 2*H, Msum, Ks,
+        N, D, 2*H, Msum,
         G_Wl1_ND2H.stride(0), G_Wl1_ND2H.stride(1), G_Wl1_ND2H.stride(2),
         G_z_Msum2H.stride(0), G_z_Msum2H.stride(1),
         x_MsumD.stride(0), x_MsumD.stride(1),
@@ -739,7 +738,7 @@ def lin1_backward(x_MsumD, y_pre_MsaveD, G_z_Msum2H, Wl1_ND2H, Wl2_NHD, h_MsumH,
 
     lin1_backward_kernel[grid2](
         G_z_Msum2H, y_pre_MsaveD, Wl1_ND2H, Wl2_NHD, h_MsumH, G_x_KMD, G_s_NM, G_y_MD, idx_Msum, which_Msum, cumsums_N,
-        M, D, Msum, Msave, H, N, Ks,
+        M, D, Msum, Msave, H, N,
         G_z_Msum2H.stride(0), G_z_Msum2H.stride(1),
         y_pre_MsaveD.stride(0), y_pre_MsaveD.stride(1),
         Wl1_ND2H.stride(0), Wl1_ND2H.stride(1), Wl1_ND2H.stride(2),
@@ -854,7 +853,7 @@ class MoEFunction(torch.autograd.Function):
     4. Save necessary information for the backward pass
     """
     @staticmethod
-    def forward(ctx, x_BSD, Wl1_ND2H, Wl2_NHD, mask_NM, s_NM, K, Ks, save_percent):
+    def forward(ctx, x_BSD, Wl1_ND2H, Wl2_NHD, mask_NM, s_NM, K, save_percent):
         B, S, _ = x_BSD.shape
 
         x_MD = rearrange(x_BSD, 'B S D -> (B S) D')
@@ -866,9 +865,8 @@ class MoEFunction(torch.autograd.Function):
         Wl2_NHD = Wl2_NHD.to(torch.bfloat16)
 
         cumsums_N, idx_Msum, sizes_N, which_Msum = find_used_experts(mask_NM, K)
-        y_MD, a_MsaveH, b_MsaveH, y_pre_MsaveD = apply_experts(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD, K, Ks, save_percent)
+        y_MD, a_MsaveH, b_MsaveH, y_pre_MsaveD = apply_experts(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD, K, save_percent)
 
-        ctx.Ks = Ks
         ctx.K = K
         ctx.save_percent = save_percent
         ctx.save_for_backward(x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD, a_MsaveH, b_MsaveH, y_pre_MsaveD)
@@ -883,7 +881,6 @@ class MoEFunction(torch.autograd.Function):
     def backward(ctx, G_y_BSD, _):
         # Load from ctx
         x_MD, s_NM, idx_Msum, which_Msum, cumsums_N, Wl1_ND2H, Wl2_NHD, a_MsaveH, b_MsaveH, y_pre_MsaveD = ctx.saved_tensors
-        Ks = ctx.Ks
         K = ctx.K
         save_percent = ctx.save_percent
 
@@ -896,10 +893,10 @@ class MoEFunction(torch.autograd.Function):
         G_y_MD = G_y_MD.to(device=Wl1_ND2H.device, dtype=torch.bfloat16)
 
         # Second linear backwards and SwiGLU backwards
-        G_Wl2_NHD, G_z_Msum2H, x_MsumD, h_MsumH = lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD, idx_Msum, cumsums_N, s_NM.T, Ks, save_percent)
+        G_Wl2_NHD, G_z_Msum2H, x_MsumD, h_MsumH = lin2_and_swiglu_backward(G_y_MD, x_MD, a_MsaveH, b_MsaveH, Wl1_ND2H, Wl2_NHD, idx_Msum, cumsums_N, s_NM.T, save_percent)
         
         # First linear backwards
-        G_Wl1_ND2H, G_s_NM, G_x_MD = lin1_backward(x_MsumD, y_pre_MsaveD, G_z_Msum2H, Wl1_ND2H, Wl2_NHD, h_MsumH, idx_Msum, which_Msum, cumsums_N, G_y_MD, K, Ks, save_percent)
+        G_Wl1_ND2H, G_s_NM, G_x_MD = lin1_backward(x_MsumD, y_pre_MsaveD, G_z_Msum2H, Wl1_ND2H, Wl2_NHD, h_MsumH, idx_Msum, which_Msum, cumsums_N, G_y_MD, K, save_percent)
 
         G_x_BSD = rearrange(G_x_MD, '(B S) D -> B S D', B=B, S=S)
 
@@ -921,7 +918,6 @@ class MoMoE(nn.Module):
         intermediate_dim,
         num_experts,
         num_chosen_experts,
-        num_shared_experts,
         save_percent=0,
         Wl1_ND2H: torch.Tensor | None = None,
         Wl2_NHD: torch.Tensor | None = None,
@@ -931,7 +927,6 @@ class MoMoE(nn.Module):
         self.H = intermediate_dim
         self.N = num_experts
         self.K = num_chosen_experts
-        self.Ks = num_shared_experts
         self.save_percent = save_percent
 
         if Wl1_ND2H is None:
@@ -958,5 +953,5 @@ class MoMoE(nn.Module):
         sizes_N: The number of experts used per token of shape (N,)
         """
 
-        y_BSD, sizes_N = MoEFunction.apply(x_BSD, self.Wl1_ND2H, self.Wl2_NHD, mask_NM, s_NM, self.K, self.Ks, self.save_percent)
+        y_BSD, sizes_N = MoEFunction.apply(x_BSD, self.Wl1_ND2H, self.Wl2_NHD, mask_NM, s_NM, self.K, self.save_percent)
         return y_BSD, sizes_N
