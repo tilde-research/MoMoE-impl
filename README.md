@@ -1,6 +1,6 @@
 # MoMoE: Memory optimized Mixture of Experts
 
-A hyper-performant SwiGLU MoE kernel, optimized for inference, as well as memory efficiency and customizability during training and finetuning.
+A hyper-performant SwiGLU MoE implementation, optimized for inference, as well as memory efficiency and customizability during training and finetuning.
 
 To read more about MoMoE, check out [our blog post](https://www.tilderesearch.com/blog/momoe)
 
@@ -51,7 +51,7 @@ y_BSD, tokens_per_expert_N = momoe(x_BSD, mask_NM, s_NM)
 
 ## Bonus Repo Features
 - This repository also comes equipped with a `TopKRouter` class, which is wrapped together with `MoMoE` into the `MoE` class. If you look in our test file `MoMoE/test.py`, this is what we use.
-- The router is a classic `topk` + `softmax` router, equipped with auxiliary loss-free load balancing, as per [this DeepSeek paper](https://arxiv.org/html/2408.15664v1).
+- The router is a classic `topk` + `softmax` router, equipped with auxiliary loss-free load balancing, as per [this DeepSeek paper](https://arxiv.org/html/2408.15664v1). Note that **you must use a K experts per token router**, not a variable number of experts per token router. Otherwise, MoMoE will fail.
 - Shared experts, can be set using `shared_experts` in our router. These are experts which are assigned to all tokens, but must also be set in `mask_NM` and `s_NM` accordingly, as a full row of values for **the last `shared_experts` experts _(it will not work as expected unless the shared experts are the last ones)_**
 
 ## Acknowledgments
