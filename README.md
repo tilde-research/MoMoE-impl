@@ -50,6 +50,10 @@ y_BSD, tokens_per_expert_N = momoe(x_BSD, mask_NM, s_NM)
 ## Acknowledgments
 This implementation would not be possible without the wonders of `torch` and `triton`. We thank the PyTorch and Triton teams for everything they have done to help the AI community.
 
+Our implementation is written to fit inside the Flash‑Linear‑Attention project, and we thank the contributors of FLA for their work. We also extend our gratitude to the developers of TorchTitan for providing a platform for LLM pre‑training.
+
+For testing, we thank the Qwen team for the open-sourced MoE models tested. We also wish to thank the Megatron LM, ScatterMoE, and MegaBlocks authors for pioneering the landscape of open-source MoE kernels.
+
 We hope you enjoy our hyper-performant MoE!
 
 ```bibtex
