@@ -49,7 +49,6 @@ class MoE(nn.Module):
             intermediate_dim=self.H,
             num_experts=self.N,
             num_chosen_experts=self.K,
-            num_shared_experts=self.Ks,
             save_percent=self.save_percent,
             Wl1_ND2H=Wl1_ND2H,
             Wl2_NHD=Wl2_NHD,

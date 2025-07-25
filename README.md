@@ -25,7 +25,6 @@ momoe = MoMoE(
     intermediate_dim=1024,
     num_experts=128,
     num_chosen_experts=8,
-    num_shared_experts=1,
     save_percent=0,
     Wl1_ND2H=None,
     Wl2_NHD=None,
@@ -40,12 +39,12 @@ y_BSD, tokens_per_expert_N = momoe(x_BSD, mask_NM, s_NM)
 ```
 ## Features
 - Customizable amount to save in forward pass (for the backward pass), can be set using `save_percent`, which should be in the range [0, 100]. If this is set to 0, only the minimum will be saved for the backward, recomputing the rest. This allows for high scalability. At the same time, setting it to 100 will save everything we need for the backward (still less than alternate implementations).
-- Shared experts, can be set using `Ks`. These are experts which are assigned to all tokens, but must also be set in `mask_NM` and `s_NM` accordingly, as a full row of values for **the last `Ks` experts.**
 - It is also possible to use MoMoE with preallocated weights. Since it is a SwiGLU MoE, we have the first linear layer weights as an `N x D x 2H` tensor and the second linear layer weights as an `N x H x D` tensor. Note that these weights must be contiguous in memory for the Triton kernels to work. **Expert parallelism (i.e. having different experts on different GPUs) is currently not supported.**
 
 ## Bonus Repo Features
 - This repository also comes equipped with a `TopKRouter` class, which is wrapped together with `MoMoE` into the `MoE` class. If you look in our test file `MoMoE/test.py`, this is what we use.
 - The router is a classic `topk` + `softmax` router, equipped with auxiliary loss-free load balancing, as per [this DeepSeek paper](https://arxiv.org/html/2408.15664v1).
+- Shared experts, can be set using `shared_experts` in our router. These are experts which are assigned to all tokens, but must also be set in `mask_NM` and `s_NM` accordingly, as a full row of values for **the last `shared_experts` experts _(it will not work as expected unless the shared experts are the last ones)_**
 
 ## Acknowledgments
 This implementation would not be possible without the wonders of `torch` and `triton`. We thank the PyTorch and Triton teams for everything they have done to help the AI community.
