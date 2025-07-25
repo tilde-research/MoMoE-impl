@@ -4,11 +4,11 @@ A hyper-performant SwiGLU MoE implementation, optimized for inference, as well a
 
 To read more about MoMoE, check out [our blog post](https://www.tilderesearch.com/blog/momoe)
 
-![Different MoE Full Pass Speeds](./MoMoE/images/moe_full.png)
+![Different MoE Full Pass Speeds](./momoe/images/moe_full.png)
 
-![Different MoE Forward Pass Speeds](./MoMoE/images/moe_forward.png)
+![Different MoE Forward Pass Speeds](./momoe/images/moe_forward.png)
 
-![Different MoE Memory Usage](./MoMoE/images/moe_memory.png)
+![Different MoE Memory Usage](./momoe/images/moe_memory.png)
 
 ## Installation
 ```bash
