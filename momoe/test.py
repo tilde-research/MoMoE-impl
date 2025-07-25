@@ -1,5 +1,5 @@
 import torch
-from sample_moe import MoE
+from momoe.sample_moe import MoE
 
 """
 Simple MoE test which trains for 200 steps with AdamW optimizer

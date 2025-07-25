@@ -12,7 +12,7 @@ To read more about MoMoE, check out [our blog post](https://www.tilderesearch.co
 
 ## Installation
 ```bash
-# Using uv (recommended pip/conda alternative) pip install
+# Using pip install (can use uv, a recommended pip/conda alternative)
 pip install git+https://github.com/tilde-research/MoMoE-impl.git
 
 # OR

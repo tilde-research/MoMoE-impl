@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from momoe import MoMoE
-from topk_router import TopKRouter
+from momoe.momoe import MoMoE
+from momoe.topk_router import TopKRouter
 
 """
 A simple end-to-end MoE implementation using MoMoE and TopKRouter.
