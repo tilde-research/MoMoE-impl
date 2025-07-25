@@ -1,0 +1,14 @@
+[project]
+name = "MoMoE-impl"
+version = "0.1.0"
+description = "implementation of MoMoE (Memory optimized Mixture of Experts)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "triton>=3.3.1",
+    "ninja>=1.11.1.4",
+    "psutil>=7.0.0",
+    "torch>=2.7.1",
+    "einops>=0.8.1",
+    "numpy>=2.2.6",
+]
