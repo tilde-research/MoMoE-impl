@@ -12,8 +12,16 @@ To read more about MoMoE, check out [our blog post](https://www.tilderesearch.co
 
 ## Installation
 ```bash
-# Using uv (recommended pip/conda alternative)
+# Using uv (recommended pip/conda alternative) pip install
+uv pip install git+https://github.com/tilde-research/MoMoE-impl.git
+
+# OR
+
+# Using git clone and uv sync 
+git clone https://github.com/tilde-research/MoMoE-impl.git
+cd MoMoE-impl
 uv sync
+source .venv/bin/activate
 ```
 
 ## Usage
