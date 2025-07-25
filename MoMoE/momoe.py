@@ -922,6 +922,21 @@ class MoMoE(nn.Module):
         Wl1_ND2H: torch.Tensor | None = None,
         Wl2_NHD: torch.Tensor | None = None,
     ):
+        """
+        Initialize the MoMoE module.
+
+        Args:
+            embedding_dim: The dimension of the input embeddings, aka D.
+            intermediate_dim: The dimension of the intermediate layer of each expert, aka H.
+            num_experts: The total number of experts, aka N.
+            num_chosen_experts: The number of chosen experts per token, aka K.
+            save_percent: The percentage of data to save for the backward pass (between 0 and 100 inclusive).
+            Wl1_ND2H: The weights of the first linear layer of shape (N, D, 2H), or None to initialize randomly.
+            Wl2_NHD: The weights of the second linear layer of shape (N, H, D), or None to initialize randomly.
+        """
+
+        assert save_percent >= 0 and save_percent <= 100, "save_percent must be between 0 and 100 inclusive, got {}".format(save_percent)
+
         super(MoMoE, self).__init__()
         self.D = embedding_dim
         self.H = intermediate_dim
